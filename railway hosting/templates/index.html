@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMEI Automation Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .input-section {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .progress-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #28a745;
+            transition: width 0.3s ease;
+        }
+        .results-section {
+            margin-top: 30px;
+        }
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .category {
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .category.not-active { background: #ffc107; }
+        .category.active-2 { background: #28a745; color: white; }
+        .category.active-15 { background: #17a2b8; color: white; }
+        .category.expired { background: #dc3545; color: white; }
+        .category.not-exist { background: #6c757d; color: white; }
+        .category.wrong-format { background: #6610f2; color: white; }
+        .count {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .imei-list-container {
+            margin-bottom: 20px;
+        }
+        .imei-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .imei-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            cursor: text;
+        }
+        .copy-btn {
+            background-color: #6c757d;
+            padding: 8px 15px;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            position: relative;
+            min-width: 60px;
+        }
+        .copy-btn:hover {
+            background-color: #545b62;
+        }
+        .copy-btn.copied {
+            background-color: #28a745;
+        }
+        .log-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .status-running { color: #007bff; }
+        .status-completed { color: #28a745; }
+        .status-error { color: #dc3545; }
+        .hidden {
+            display: none;
+        }
+        .copy-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10000;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .copy-fallback {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #ffc107;
+            color: #000;
+            padding: 10px;
+            text-align: center;
+            z-index: 10000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="copyToast" class="copy-toast">
+        ✓ Copied to clipboard!
+    </div>
+
+    <div id="copyFallback" class="copy-fallback">
+        Text has been selected. Press <strong>Ctrl+C</strong> to copy.
+    </div>
+
+    <div class="container">
+        <h1>📱 IMEI Automation Tool</h1>
+        
+        <div class="input-section">
+            <h3>Enter IMEI Numbers (one per line):</h3>
+            <textarea id="imeiInput" placeholder="Enter IMEI numbers, one per line...
+Example:
+863000065843373
+861260070166994
+860897071584096"></textarea>
+            <div>
+                <button id="startBtn" onclick="startAutomation()">Start Automation</button>
+                <button id="clearBtn" onclick="clearInput()">Clear</button>
+            </div>
+        </div>
+
+        <div id="progressSection" class="progress-section hidden">
+            <h3>Progress</h3>
+            <div id="statusMessage">Starting automation...</div>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="progressText">0% (0/0)</div>
+            <div id="batchInfo"></div>
+        </div>
+
+        <div id="resultsSection" class="results-section hidden">
+            <h3>Results</h3>
+            
+            <div class="categories">
+                <div class="category not-active">
+                    <div>NOT ACTIVE</div>
+                    <div id="countNotActive" class="count">0</div>
+                    <div>No activation date</div>
+                </div>
+                <div class="category active-2">
+                    <div>ACTIVE 0-2 DAYS</div>
+                    <div id="countActive2" class="count">0</div>
+                    <div>Recently activated</div>
+                </div>
+                <div class="category active-15">
+                    <div>ACTIVE 3-15 DAYS</div>
+                    <div id="countActive15" class="count">0</div>
+                    <div>Moderately active</div>
+                </div>
+                <div class="category expired">
+                    <div>EXPIRED (15+)</div>
+                    <div id="countExpired" class="count">0</div>
+                    <div>Old activations</div>
+                </div>
+                <div class="category not-exist">
+                    <div>NOT EXIST</div>
+                    <div id="countNotExist" class="count">0</div>
+                    <div>IMEI not found</div>
+                </div>
+                <div class="category wrong-format">
+                    <div>WRONG FORMAT</div>
+                    <div id="countWrongFormat" class="count">0</div>
+                    <div>Invalid format</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h4>IMEI Lists (Click to copy):</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>NOT ACTIVE:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listNotActive', this)">Copy</button>
+                        </div>
+                        <div id="listNotActive" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>ACTIVE 0-2 DAYS:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listActive2', this)">Copy</button>
+                        </div>
+                        <div id="listActive2" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>ACTIVE 3-15 DAYS:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listActive15', this)">Copy</button>
+                        </div>
+                        <div id="listActive15" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>EXPIRED:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listExpired', this)">Copy</button>
+                        </div>
+                        <div id="listExpired" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>NOT EXIST:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listNotExist', this)">Copy</button>
+                        </div>
+                        <div id="listNotExist" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                    <div class="imei-list-container">
+                        <div class="imei-list-header">
+                            <h5>WRONG FORMAT:</h5>
+                            <button class="copy-btn" onclick="copyToClipboard('listWrongFormat', this)">Copy</button>
+                        </div>
+                        <div id="listWrongFormat" class="imei-list" onclick="selectAndCopy(this)">None</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h4>Live Log:</h4>
+            <div id="liveLog"></div>
+        </div>
+    </div>
+
+    <script>
+        let automationInterval;
+        
+        function startAutomation() {
+            const imeiText = document.getElementById('imeiInput').value.trim();
+            if (!imeiText) {
+                alert('Please enter at least one IMEI number');
+                return;
+            }
+
+            const startBtn = document.getElementById('startBtn');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Processing...';
+
+            // Show progress section
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+
+            // Start automation
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ imeis: imeiText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error: ' + data.error);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Automation';
+                    return;
+                }
+                
+                // Start polling for progress
+                automationInterval = setInterval(checkProgress, 1000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to start automation');
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Automation';
+            });
+        }
+
+        function checkProgress() {
+            fetch('/api/progress')
+                .then(response => response.json())
+                .then(progress => {
+                    updateProgress(progress);
+                    
+                    if (progress.status === 'completed' || progress.status === 'error') {
+                        clearInterval(automationInterval);
+                        
+                        const startBtn = document.getElementById('startBtn');
+                        startBtn.disabled = false;
+                        startBtn.textContent = 'Start Automation';
+                        
+                        if (progress.status === 'completed' && progress.results) {
+                            displayResults(progress.results);
+                        } else if (progress.status === 'error') {
+                            alert('Automation failed: ' + progress.error);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking progress:', error);
+                });
+        }
+
+        function updateProgress(progress) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusMessage = document.getElementById('statusMessage');
+            const batchInfo = document.getElementById('batchInfo');
+            const liveLog = document.getElementById('liveLog');
+
+            // Update progress bar
+            const progressPercent = progress.progress || 0;
+            progressFill.style.width = progressPercent + '%';
+            
+            const processed = Math.round(progress.total * progressPercent / 100);
+            progressText.textContent = `${progressPercent.toFixed(1)}% (${processed}/${progress.total})`;
+            
+            // Update status message
+            statusMessage.textContent = progress.message;
+            statusMessage.className = `status-${progress.status}`;
+            
+            // Update batch info
+            if (progress.total_batches > 0) {
+                batchInfo.textContent = `Batch: ${progress.current_batch}/${progress.total_batches}`;
+            }
+            
+            // Add to live log
+            if (progress.message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${timestamp}] ${progress.message}`;
+                liveLog.insertBefore(logEntry, liveLog.firstChild);
+                
+                // Keep only last 20 log entries
+                if (liveLog.children.length > 20) {
+                    liveLog.removeChild(liveLog.lastChild);
+                }
+            }
+        }
+
+        function displayResults(results) {
+            document.getElementById('resultsSection').classList.remove('hidden');
+            
+            if (results.success) {
+                const summary = results.summary;
+                
+                // Update counts
+                document.getElementById('countNotActive').textContent = summary.not_active || 0;
+                document.getElementById('countActive2').textContent = summary.active_2_days || 0;
+                document.getElementById('countActive15').textContent = summary.active_3_15 || 0;
+                document.getElementById('countExpired').textContent = summary.expired || 0;
+                document.getElementById('countNotExist').textContent = summary.not_exist || 0;
+                document.getElementById('countWrongFormat').textContent = summary.wrong_format || 0;
+                
+                // Update IMEI lists
+                document.getElementById('listNotActive').textContent = results.categories.not_active.join('\n') || 'None';
+                document.getElementById('listActive2').textContent = results.categories.active_2_days.join('\n') || 'None';
+                document.getElementById('listActive15').textContent = results.categories.active_3_15.join('\n') || 'None';
+                document.getElementById('listExpired').textContent = results.categories.expired.join('\n') || 'None';
+                document.getElementById('listNotExist').textContent = results.categories.not_exist.join('\n') || 'None';
+                document.getElementById('listWrongFormat').textContent = results.categories.wrong_format.join('\n') || 'None';
+                
+                // Add final log entry
+                const liveLog = document.getElementById('liveLog');
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.innerHTML = `<strong>[${timestamp}] Automation completed! Processed ${results.total_processed} IMEIs</strong>`;
+                liveLog.insertBefore(logEntry, liveLog.firstChild);
+                
+            } else {
+                alert('Automation failed: ' + results.error);
+            }
+        }
+
+        // ULTRA-RELIABLE CLIPBOARD COPY FUNCTION WITH VISUAL FEEDBACK
+        function copyToClipboard(elementId, button) {
+            const element = document.getElementById(elementId);
+            let text = element.textContent;
+            
+            if (text === 'None') {
+                alert('No IMEIs to copy in this category');
+                return;
+            }
+            
+            // Store original button text
+            const originalText = button.textContent;
+            
+            // Method 1: Modern Clipboard API (works on HTTPS and localhost)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopySuccess(button);
+                }).catch(err => {
+                    // Fallback to Method 2
+                    console.log('Clipboard API failed, trying fallback...');
+                    copyWithFallback(element, button);
+                });
+            } else {
+                // Method 2: Fallback for non-secure contexts
+                copyWithFallback(element, button);
+            }
+        }
+
+        function copyWithFallback(element, button) {
+            const text = element.textContent;
+            
+            // Create a temporary textarea
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '0';
+            textArea.style.top = '0';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            
+            // Select and copy
+            textArea.select();
+            textArea.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                const successful = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (successful) {
+                    showCopySuccess(button);
+                } else {
+                    // Method 3: Ultimate fallback - show selection
+                    showManualCopy(element, button);
+                }
+            } catch (err) {
+                document.body.removeChild(textArea);
+                // Method 3: Ultimate fallback - show selection
+                showManualCopy(element, button);
+            }
+        }
+
+        function showManualCopy(element, button) {
+            // Select the text in the actual element
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Show manual copy instructions
+            const fallback = document.getElementById('copyFallback');
+            fallback.style.display = 'block';
+            
+            // Still show button feedback
+            showCopySuccess(button);
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                fallback.style.display = 'none';
+                selection.removeAllRanges();
+            }, 3000);
+        }
+
+        function showCopySuccess(button) {
+            // Show toast notification
+            const toast = document.getElementById('copyToast');
+            toast.style.display = 'block';
+            
+            // Hide toast after 2 seconds
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+            
+            // Change button appearance
+            button.textContent = 'Copied!';
+            button.classList.add('copied');
+            
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                button.textContent = 'Copy';
+                button.classList.remove('copied');
+            }, 2000);
+        }
+
+        function selectAndCopy(element) {
+            // Select text when clicking on the IMEI list
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Try to copy automatically and show success
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(element.textContent).then(() => {
+                        // Show toast for click-to-copy
+                        const toast = document.getElementById('copyToast');
+                        toast.style.display = 'block';
+                        setTimeout(() => {
+                            toast.style.display = 'none';
+                        }, 2000);
+                        
+                        // Show brief visual feedback on the element
+                        element.style.backgroundColor = '#e8f5e8';
+                        setTimeout(() => {
+                            element.style.backgroundColor = '';
+                        }, 1000);
+                    });
+                }
+            } catch (err) {
+                // Ignore errors for click-to-select
+            }
+        }
+
+        function clearInput() {
+            document.getElementById('imeiInput').value = '';
+        }
+
+        // Add some sample IMEIs for testing
+        document.getElementById('imeiInput').value = `863000065843373
+860897071584492
+861260070166994y
+860897071584098
+860897071549735
+860897074788777`;
+    </script>
+</body>
+</html>
